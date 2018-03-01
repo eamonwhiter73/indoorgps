@@ -122,8 +122,10 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
     var scalePOS: CGFloat!
     var origin: Array! = []
     var m: matrix_float4x4 = matrix_float4x4()
-    var mScale: matrix_float4x4 = matrix_float4x4()
     var mRotate: matrix_float4x4 = matrix_float4x4()
+    var originAsMapPoint: MKMapPoint = MKMapPoint()
+    var currentHeading: CLLocationDirection!
+    var angle: CLLocationDirection!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -144,19 +146,9 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
             We setup a pair of anchors that will define how the floorplan image
             maps to geographic co-ordinates.
         */
-        let anchor1 = GeoAnchor(latitudeLongitudeCoordinate: CLLocationCoordinate2DMake(42.246960,-71.175248), pdfPoint: CGPoint(x: 1.8781, y: 1.7512))
-
-        let anchor2 = GeoAnchor(latitudeLongitudeCoordinate: CLLocationCoordinate2DMake(42.246876,-71.175277), pdfPoint: CGPoint(x: 1.75, y: -1.02))
+        let anchor1 = GeoAnchor(latitudeLongitudeCoordinate: CLLocationCoordinate2DMake(42.246960,-71.175248), pdfPoint: CGPoint(x: -1.7512, y: -1.8781))
         
-        
- 
-        /*let pointHypot = hypot(1.8781 - 1.75, 1.7512 - (-1.02))
-        let mapPoint1 = MKMapPointForCoordinate(CLLocationCoordinate2D(latitude: 42.246960, longitude:-71.175248))
-        let mapPoint2 = MKMapPointForCoordinate(CLLocationCoordinate2D(latitude: 42.246876, longitude:-71.175277))
-        let metersBetweenPoints = MKMetersBetweenMapPoints(mapPoint1, mapPoint2)*/
-        
-        //scale = pointHypot / metersBetweenPoints
-        //print("\(scale) --- scale")
+        let anchor2 = GeoAnchor(latitudeLongitudeCoordinate: CLLocationCoordinate2DMake(42.246876,-71.175277), pdfPoint: CGPoint(x: 0.74, y: -1.75))
 
         let anchorPair = GeoAnchorPair(fromAnchor: anchor1, toAnchor: anchor2)
 
@@ -168,46 +160,87 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
         print("\(transformerFromPDFToMk.ty) -- ty")
         origin = [transformerFromPDFToMk.tx, transformerFromPDFToMk.ty]
         
-        /*ar sim = simd_float3x3()
-        sim.columns.2 = [0.0, 0.0, 1.0]
-        sim.columns.1 = [Float(transformerFromPDFToMk.b), Float(transformerFromPDFToMk.d), Float(transformerFromPDFToMk.ty)]
-        sim.columns.0 = [Float(transformerFromPDFToMk.a), Float(transformerFromPDFToMk.c), Float(transformerFromPDFToMk.tx)]*/
-        
-        //ADD SCALE TO WORLD ORIGIN TRANSFORM ////////////////////////////////////////////
-        print("\(transformerFromPDFToMk.a) --- transformerFromPDFToMk.a")
-        print("\(transformerFromPDFToMk.b) --- transformerFromPDFToMk.b")
-        print("\(transformerFromPDFToMk.c) --- transformerFromPDFToMk.c")
-        print("\(transformerFromPDFToMk.d) --- transformerFromPDFToMk.d")
-        
-        let angle = coordinateConverter.getUprightMKMapCameraHeading()
+        angle = coordinateConverter.getUprightMKMapCameraHeading()
         print("\(angle) --- angle")
         
         m = matrix_float4x4()
-        m.columns.3 = [Float(transformerFromPDFToMk.tx), 1.0, Float(transformerFromPDFToMk.ty), 1.0]
+        m.columns.3 = [Float(transformerFromPDFToMk.tx) / (Float(coordinateConverter.unitSizeInMeters) * 2000), 0.0, Float(transformerFromPDFToMk.ty) / (Float(coordinateConverter.unitSizeInMeters) * 2000), 1.0]
         m.columns.2 = [0.0, 0.0, 1.0, 0.0]
         m.columns.1 = [0.0, 1.0, 0.0, 0.0]
         m.columns.0 = [1.0, 0.0, 0.0, 0.0]
         
         mRotate = matrix_float4x4()
-        m.columns.3 = [0.0, 0.0, 0.0, 1.0]
-        m.columns.2 = [Float(sin(angle)), 0.0, Float(cos(angle)), 0.0]
-        m.columns.1 = [0.0, 0.0, 0.0, 0.0]
-        m.columns.0 = [Float(cos(angle)), 0.0, Float(-sin(angle)), 0.0]
+        mRotate.columns.3 = [0.0, 0.0, 0.0, 1.0]
+        mRotate.columns.2 = [Float(sin(angle)), 0.0, Float(cos(angle)), 0.0]
+        mRotate.columns.1 = [0.0, 1.0, 0.0, 0.0]
+        mRotate.columns.0 = [Float(cos(angle)), 0.0, Float(-sin(angle)), 0.0]
         
-        print("\(String(describing: sceneView.session.configuration)) --- sceneView.session")
+        var mRotateZ = matrix_float4x4()
+        mRotateZ.columns.3 = [0.0, 0.0, 0.0, 1.0]
+        mRotateZ.columns.2 = [0.0, 0.0, 1.0, 0.0]
+        mRotate.columns.1 = [Float(-sin(angle)), Float(cos(angle)), 0.0, 0.0]
+        mRotate.columns.0 = [Float(cos(angle)), Float(sin(angle)), 0.0, 0.0]
         
         var sim = simd_float3()
         sim.x = Float(transformerFromPDFToMk.tx)
         sim.y = 0.0
         sim.z = Float(transformerFromPDFToMk.ty)
         
+        var simd = simd_float4x4()
+        simd.columns.3 = [sim.x, sim.y, sim.z, 1.0]
+        simd.columns.2 = [0.0, 0.0, 1.0, 0.0]
+        simd.columns.1 = [0.0, 1.0, 0.0, 0.0]
+        simd.columns.0 = [1.0, 0.0, 0.0, 0.0]
+        
+        var mm = SCNMatrix4()
+        mm.m41 = sim.x; mm.m42 = sim.y; mm.m43 = sim.z; mm.m44 = 1.0
+        mm.m31 = 0.0; mm.m32 = 0.0; mm.m33 = 1.0; mm.m34 = 0.0
+        mm.m21 = 0.0; mm.m22 = 1.0; mm.m23 = 0.0; mm.m34 = 0.0
+        mm.m11 = 1.0; mm.m22 = 0.0; mm.m23 = 0.0; mm.m34 = 0.0
+        
+        var mmRotate = SCNMatrix4()
+        mm.m41 = 0.0; mm.m42 = 0.0; mm.m43 = 0.0; mm.m44 = 1.0
+        mm.m31 = Float(sin(angle)); mm.m32 = 0.0; mm.m33 = Float(cos(angle)); mm.m34 = 0.0
+        mm.m21 = 0.0; mm.m22 = 1.0; mm.m23 = 0.0; mm.m34 = 0.0
+        mm.m11 = Float(cos(angle)); mm.m22 = 0.0; mm.m23 = Float(-sin(angle)); mm.m34 = 0.0
+        
+        var mmm = SCNMatrix4()
+        mm.m41 = 0.0; mm.m42 = 0.0; mm.m43 = 0.0; mm.m44 = 1.0
+        mm.m31 = 0.0; mm.m32 = 0.0; mm.m33 = 1.0; mm.m34 = 0.0
+        mm.m21 = 0.0; mm.m22 = 1.0; mm.m23 = 0.0; mm.m34 = 0.0
+        mm.m11 = 1.0; mm.m22 = 0.0; mm.m23 = 0.0; mm.m34 = 0.0
+        
+        var identity = matrix_float4x4()
+        identity.columns.3 = [0.0, 0.0, 0.0, 1.0]
+        identity.columns.2 = [0.0, 0.0, 1.0, 0.0]
+        identity.columns.1 = [0.0, 1.0, 0.0, 0.0]
+        identity.columns.0 = [1.0, 0.0, 0.0, 0.0]
+        
         sceneView.scene = scene
-        //sceneView.scene.rootNode.simdPosition = sim
-
         view.addSubview(sceneView)
         
+        let transformed: matrix_float4x4 = m * mRotate
+        print("\(transformed) --- transformed")
         
-
+        //sceneView.session.setWorldOrigin(relativeTransform: transformed)
+        sceneView.session.setWorldOrigin(relativeTransform: m)
+        
+        sceneView.scene.rootNode.position = SCNVector3Make(-Float(transformerFromPDFToMk.tx) / (Float(coordinateConverter.unitSizeInMeters) * 2000), sceneView.scene.rootNode.position.y, -Float(transformerFromPDFToMk.ty) / (Float(coordinateConverter.unitSizeInMeters) * 2000))
+        
+        //sceneView.scene.rootNode.transform = SCNMatrix4Mult(mm, mmRotate)
+        
+        for node in scene.rootNode.childNodes {
+            
+            /*let sim3 = simd_float3()
+            sim.x = -Float(transformerFromPDFToMk.tx) / Float(coordinateConverter.unitSizeInMeters) + node.position.x / Float(coordinateConverter.unitSizeInMeters)
+            sim.y = node.position.y / Float(coordinateConverter.unitSizeInMeters)
+            sim.z = -Float(transformerFromPDFToMk.ty) / Float(coordinateConverter.unitSizeInMeters) + node.position.z / Float(coordinateConverter.unitSizeInMeters)*/
+            
+            node.position = SCNVector3Make(-Float(transformerFromPDFToMk.tx) / (Float(coordinateConverter.unitSizeInMeters) * 2000) + node.position.x, node.position.y, -Float(transformerFromPDFToMk.ty) / (Float(coordinateConverter.unitSizeInMeters) * 2000) + node.position.z)
+            
+            node.runAction(SCNAction .rotateBy(x: 0.0, y: .pi, z: 0.0, duration: 0.0))
+        }
+        
         //floorLevel = level
         /*
             Pick a triangle on your PDF that you would like to highlight in
@@ -267,7 +300,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
     }
     
     func renderer(_ renderer: SCNSceneRenderer, willRenderScene scene: SCNScene, atTime time: TimeInterval) {
-    
+        
     }
     
     func renderer(_ renderer: SCNSceneRenderer, didRemove node: SCNNode, for anchor: ARAnchor) {
@@ -288,15 +321,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
         }
         else {
             let config = ARWorldTrackingConfiguration()
-            config.worldAlignment = .gravity
-            
-            mScale = matrix_float4x4()
-            m.columns.3 = [0.0, 0.0, 0.0, 1.0]
-            m.columns.2 = [0.0, 0.0, 1.0, 0.0]
-            m.columns.1 = [0.0, 1.0, 0.0, 0.0]
-            m.columns.0 = [1.0, 0.0, 0.0, 0.0]
-            
-            //sceneView.session.setWorldOrigin(relativeTransform: mRotate)
+            config.worldAlignment = .gravityAndHeading
             
             sceneView.session.run(config)
         }
@@ -319,15 +344,19 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
             way in production.
         */
         //mapView.mapType = MKMapTypeStandard
-        sceneView.session.setWorldOrigin(relativeTransform: mRotate)
-        sceneView.session.setWorldOrigin(relativeTransform: m)
     }
     
     override func viewDidLayoutSubviews() {
         sceneView.frame = self.view.frame
     }
+    
+    func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
+        self.currentHeading = newHeading.trueHeading
+    }
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        
+
         print("\((locations.last?.coordinate.latitude)!) --- (locations.last?.coordinate.longitude)!")
         print("\(sceneView.session.configuration.debugDescription) --- sceneView.session.configuration")
 
@@ -336,14 +365,14 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
         let c = coordinateConverter.anchors.toAnchor.pdfPoint
         let d = coordinateConverter.anchors.fromAnchor.pdfPoint
         
-        var metersLat = MKMetersBetweenMapPoints(a, MKMapPointForCoordinate(CLLocationCoordinate2D(latitude: coordinateConverter.anchors.toAnchor.latitudeLongitudeCoordinate.latitude + 1.0, longitude: coordinateConverter.anchors.toAnchor.latitudeLongitudeCoordinate.longitude)))
+        let metersLat = MKMetersBetweenMapPoints(a, MKMapPointForCoordinate(CLLocationCoordinate2D(latitude: coordinateConverter.anchors.toAnchor.latitudeLongitudeCoordinate.latitude + 1.0, longitude: coordinateConverter.anchors.toAnchor.latitudeLongitudeCoordinate.longitude)))
         
         let me = MKMapPointForCoordinate((locations.last?.coordinate)!)
         
         scalePDF = hypot(c.x - d.x, c.y - d.y) / CGFloat(MKMetersBetweenMapPoints(a, b))
         
-        var newLng = (locations.last?.coordinate.longitude)!
-        var newLat = (locations.last?.coordinate.latitude)! - (6.0 / metersLat)
+        let newLng = (locations.last?.coordinate.longitude)!
+        let newLat = (locations.last?.coordinate.latitude)! - (6.0 / metersLat)
         
         scalePOS = hypot(6.0 - 0.0, 0.0) / CGFloat(MKMetersBetweenMapPoints(me, MKMapPointForCoordinate(CLLocationCoordinate2D(latitude: newLat, longitude: newLng))))
         
@@ -354,7 +383,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
         print("\(CGFloat(me.x) / CGFloat(coordinateConverter.unitSizeInMeters)) --- myLongitude MK")
         print("\(CGFloat(me.y) / CGFloat(coordinateConverter.unitSizeInMeters)) --- myLatitude MK")
         print("\(coordinateConverter.unitSizeInMeters) --- unitSizeInMeters")
-        var originAsMapPoint = coordinateConverter.MKMapPointFromPDFPoint(CGPoint(x:0.0,y:0.0))
+        originAsMapPoint = coordinateConverter.MKMapPointFromPDFPoint(CGPoint(x:0.0,y:0.0))
         print("\(originAsMapPoint.x) --- originAsMapPointx")
         print("\(originAsMapPoint.y) --- originAsMapPointy")
 
@@ -392,11 +421,13 @@ class ViewController: UIViewController, ARSCNViewDelegate, CLLocationManagerDele
                 // Ask the user for permission to use location.
                 locationManager.requestAlwaysAuthorization()
                 locationManager.startUpdatingLocation()
+                locationManager.startUpdatingHeading()
             case CLAuthorizationStatus.denied:
                 NSLog("Please authorize location services for this app under Settings > Privacy")
             case CLAuthorizationStatus.authorizedAlways, CLAuthorizationStatus.authorizedWhenInUse:
                 locationManager.requestAlwaysAuthorization()
                 locationManager.startUpdatingLocation()
+                locationManager.startUpdatingHeading()
             case CLAuthorizationStatus.restricted:
                 break
         }
