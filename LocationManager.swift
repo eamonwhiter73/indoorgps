@@ -82,29 +82,42 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
             let proximityUUIDB = UUID(uuidString:
                 "E2C56DB5-DFFB-48D2-B060-D0F5A71096E0")
             
-            let beaconRegionD = CLBeaconRegion(
+            let beaconRegionA = CLBeaconRegion(
                 proximityUUID: proximityUUIDB!,
                 major: 0x0001,
                 minor: 0x0004,
-                identifier: "locationA")
+                identifier: "locationA 49398")
+            
+            let beaconRegionB = CLBeaconRegion(
+                proximityUUID: proximityUUIDB!,
+                major: 0x0001,
+                minor: 0x0002,
+                identifier: "locationB 49267")
+            
+            let beaconRegionC = CLBeaconRegion(
+                proximityUUID: proximityUUIDB!,
+                major: 0x0001,
+                minor: 0x0005,
+                identifier: "locationC 49141")
+            
+            let beaconRegionD = CLBeaconRegion(
+                proximityUUID: proximityUUIDA!,
+                major: 0x0001,
+                minor: 0x0003,
+                identifier: "locationD DSDTECH")
             
             let beaconRegionE = CLBeaconRegion(
                 proximityUUID: proximityUUIDB!,
                 major: 0x0001,
-                minor: 0x0002,
-                identifier: "locationB")
+                minor: 0x0001,
+                identifier: "locationE 33803")
             
-            let beaconRegionF = CLBeaconRegion(
-                proximityUUID: proximityUUIDB!,
-                major: 0x0001,
-                minor: 0x0005,
-                identifier: "locationC")
-            
+            self.locationManager?.startMonitoring(for: beaconRegionA)
+            self.locationManager?.startMonitoring(for: beaconRegionB)
+            self.locationManager?.startMonitoring(for: beaconRegionC)
             self.locationManager?.startMonitoring(for: beaconRegionD)
             self.locationManager?.startMonitoring(for: beaconRegionE)
-            self.locationManager?.startMonitoring(for: beaconRegionF)
             
-
             print("\(String(describing: self.locationManager?.monitoredRegions)) + monitoredRegions")
         }
     }
@@ -124,15 +137,6 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     }
     
     func locationManager(_ manager: CLLocationManager, didEnterRegion region: CLRegion) {
-        if region is CLBeaconRegion {
-            // Start ranging only if the feature is available.
-            if CLLocationManager.isRangingAvailable() {
-                locationManager?.startRangingBeacons(in: region as! CLBeaconRegion)
-                
-                // Store the beacon so that ranging can be stopped on demand.
-                beaconsToRange.append(region as! CLBeaconRegion)
-            }
-        }
         self.delegate?.locationManagerDidEnterRegion(self.locationManager, didEnterRegion: region)
     }
     
@@ -142,14 +146,16 @@ class LocationManager: NSObject, CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didDetermineState state: CLRegionState, for region: CLRegion) {
         if region is CLBeaconRegion {
-            print("determined state of beacon for region - \(region)")
-            // Start ranging only if the feature is available.
-            if CLLocationManager.isRangingAvailable() {
-                print("determined state of beacon and started ranging")
-                locationManager?.startRangingBeacons(in: region as! CLBeaconRegion)
-                // Store the beacon so that ranging can be stopped on demand.
-                beaconsToRange.append(region as! CLBeaconRegion)
-            }
+            //if state == CLRegionState.inside {
+                print("determined state of beacon for region - \(region)")
+                // Start ranging only if the feature is available.
+                if CLLocationManager.isRangingAvailable() {
+                    print("determined state of beacon and started ranging")
+                    locationManager?.startRangingBeacons(in: region as! CLBeaconRegion)
+                    // Store the beacon so that ranging can be stopped on demand.
+                    beaconsToRange.append(region as! CLBeaconRegion)
+                }
+            //}
         }
         
         self.delegate?.locationManagerDidDetermineState(self.locationManager, didDetermineState: state, region: region)

@@ -19,6 +19,18 @@ class Point: NSObject {
     }
 }
 
+class IntersectPoints: NSObject {
+    var P1: Point
+    var P2: Point
+    var points: Array<Point>
+    
+    init(p1:Point, p2:Point, poin: Array<Point>) {
+        P1 = p1
+        P2 = p2
+        points = poin
+    }
+}
+
 class Trilateration: NSObject {
     
     static func trilateration(point1: Point, point2: Point, point3: Point, r1: Double, r2:Double, r3: Double) -> Point {
@@ -48,6 +60,60 @@ class Trilateration: NSObject {
         let location = Point(xx: X,yy: Y)
         
         return location
+    }
+    
+    /*static func multiPointTrilateration(point1: Point, point2: Point, point3: Point, point4: Point, point5: Point, r1: Double, r2:Double, r3: Double, r4: Double, r5: Double) -> Point {
+        
+        
+        
+        return Point()
+    }*/
+    
+    static func calculateIntersections(p1: Point, p2: Point, r1Bigger: Float, r2Smaller: Float, n: Array<Point>) -> IntersectPoints {
+        
+        let distanceBetween = sqrt(pow((p1.x! - p2.x!), 2) + pow((p1.y! - p2.y!), 2))
+        
+        print("\(distanceBetween) --- distanceBetween")
+        //print("\(p1.x) --- \(p1.y) --- \(p2.x) --- \(p2.y)")
+        var r2SmallerAdjusted: Float = r2Smaller
+        var r1BiggerAdjusted: Float = r1Bigger
+        if (Float(distanceBetween) > r1Bigger + r2Smaller) {
+            print("distanceBetween > rBigger + r2Smaller")
+            //r2SmallerAdjusted = Float(distanceBetween) - r1Bigger
+        }
+        else if (Float(distanceBetween) < abs(r1Bigger - r2Smaller)) {
+            print("distanceBetween < abs(r1Bigger - r2Smaller)")
+            if r1Bigger > r2Smaller {
+                r1BiggerAdjusted = Float(distanceBetween) + r2Smaller - 0.1
+            }
+            else if (r2Smaller > r1Bigger){
+                r2SmallerAdjusted = Float(distanceBetween) + r1Bigger - 0.1
+            }
+        }
+        else if (Float(distanceBetween) == 0) {
+            print("distanceBetween == 0")
+        }
+        else if (r1Bigger == r2Smaller) {
+            print("r1Bigger == r2Smaller")
+            //r2SmallerAdjusted = r2Smaller + 0.01
+        }
+        
+        let a = (pow(r1BiggerAdjusted, 2) - pow(r2SmallerAdjusted, 2) + Float(pow(distanceBetween, 2)) ) / (2 * Float(distanceBetween))
+        
+        let hSquared = pow(r1BiggerAdjusted, 2) - pow(a, 2)
+        let numer = a * Float((p2.x! - p1.x!) - (p2.y! - p1.y!))
+        let crossingPointX = (Float(p1.x!) + numer) / Float(distanceBetween)
+        let crossingPointY = (Float(p1.y!) + numer) / Float(distanceBetween)
+        let axisIntersect = Point(xx: Double(crossingPointX), yy: Double(crossingPointY))
+        
+        let x3a = Float(axisIntersect.x!) + sqrt(hSquared) * Float( p2.y! - p1.y! ) / Float(distanceBetween)
+        let x3b = Float(axisIntersect.x!) - sqrt(hSquared) * Float( p2.y! - p1.y! ) / Float(distanceBetween)
+        let y3a = Float(axisIntersect.y!) - sqrt(hSquared) * Float( p2.x! - p1.x! ) / Float(distanceBetween)
+        let y3b = Float(axisIntersect.y!) + sqrt(hSquared) * Float( p2.x! - p1.x! ) / Float(distanceBetween)
+        
+        let intersectPoints = IntersectPoints(p1: Point(xx: Double(x3a), yy: Double(y3a)), p2: Point(xx: Double(x3b), yy: Double(y3b)), poin: [n[0], n[1]])
+        
+        return intersectPoints
     }
 }
 
